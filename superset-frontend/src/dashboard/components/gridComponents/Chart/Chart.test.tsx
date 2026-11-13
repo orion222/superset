@@ -17,7 +17,15 @@
  * under the License.
  */
 import { useEffect } from 'react';
-import { act, fireEvent, render } from 'spec/helpers/testing-library';
+import {
+  act,
+  createStore,
+  fireEvent,
+  render,
+} from 'spec/helpers/testing-library';
+import reducerIndex from 'spec/helpers/reducerIndex';
+import { updateDataMask } from 'src/dataMask/actions';
+import type { DataMask } from '@superset-ui/core';
 import {
   DatasourceType,
   FeatureFlag,
@@ -25,6 +33,8 @@ import {
   VizType,
 } from '@superset-ui/core';
 import * as redux from 'redux';
+import { commands, menus } from 'src/core';
+import type { common } from '@apache-superset/core';
 
 import * as exploreUtils from 'src/explore/exploreUtils';
 import * as chartStateConverter from '../../../util/chartStateConverter';
@@ -43,6 +53,7 @@ import {
   type DashboardDatasetsContextValue,
 } from 'src/dashboard/contexts/DashboardDatasetsContext';
 import { buildQuery as buildTableQuery } from '../../../../../plugins/plugin-chart-table/src/buildQuery';
+import { buildQueryUncached as buildInteractiveQuery } from '../../../../../plugins/plugin-chart-ag-grid-table/src/buildQuery';
 import type { TableChartFormData } from '../../../../../plugins/plugin-chart-table/src/types';
 
 let capturedChartContainerProps: Record<string, unknown> = {};
@@ -405,57 +416,62 @@ test('ignores prior metadata when a completed response omits the semantic source
   );
 });
 
-test('omits a dormant semantic grain when current metadata proves the axis non-temporal', () => {
-  const savedFormData = {
-    ...chartQueries[queryId].form_data,
-    datasource: '2__semantic_view',
-    viz_type: VizType.Table,
-    metrics: ['orders'],
-    groupby: ['country'],
-    granularity: undefined,
-    time_grain_sqla: TimeGranularity.DAY,
-    temporal_columns_lookup: { country: true },
-  };
-  setup(
-    {},
-    {
-      charts: {
-        ...defaultState.charts,
-        [queryId]: {
-          ...defaultState.charts[queryId],
-          form_data: savedFormData,
+test.each([VizType.Table, VizType.TableAgGrid])(
+  'omits a dormant semantic grain for %s when current metadata proves the axis non-temporal',
+  vizType => {
+    const savedFormData = {
+      ...chartQueries[queryId].form_data,
+      datasource: '2__semantic_view',
+      viz_type: vizType,
+      metrics: ['orders'],
+      groupby: ['country'],
+      granularity: undefined,
+      time_grain_sqla: TimeGranularity.DAY,
+      temporal_columns_lookup: { country: true },
+    };
+    setup(
+      {},
+      {
+        charts: {
+          ...defaultState.charts,
+          [queryId]: {
+            ...defaultState.charts[queryId],
+            form_data: savedFormData,
+          },
+        },
+        datasources: {
+          '2__semantic_view': {
+            ...mockDatasource['7__table'],
+            type: DatasourceType.SemanticView,
+            columns: [{ column_name: 'country', is_dttm: false }],
+          },
+        },
+        dashboardState: {
+          ...defaultState.dashboardState,
+          datasetsStatus: 'complete',
         },
       },
-      datasources: {
-        '2__semantic_view': {
-          ...mockDatasource['7__table'],
-          type: DatasourceType.SemanticView,
-          columns: [{ column_name: 'country', is_dttm: false }],
-        },
+      {
+        dashboardId: props.dashboardId,
+        datasets: [
+          {
+            uid: '2__semantic_view',
+            type: DatasourceType.SemanticView,
+            columns: [{ column_name: 'country', is_dttm: false }],
+          },
+        ],
       },
-      dashboardState: {
-        ...defaultState.dashboardState,
-        datasetsStatus: 'complete',
-      },
-    },
-    {
-      dashboardId: props.dashboardId,
-      datasets: [
-        {
-          uid: '2__semantic_view',
-          type: DatasourceType.SemanticView,
-          columns: [{ column_name: 'country', is_dttm: false }],
-        },
-      ],
-    },
-  );
+    );
 
-  const formData = capturedChartContainerProps.formData as TableChartFormData;
-  expect(formData.temporal_columns_lookup).toEqual({ country: false });
-  expect(buildTableQuery(formData).queries[0].extras).not.toHaveProperty(
-    'time_grain_sqla',
-  );
-});
+    const formData = capturedChartContainerProps.formData as TableChartFormData;
+    expect(formData.temporal_columns_lookup).toEqual({ country: false });
+    expect(
+      (vizType === VizType.Table ? buildTableQuery : buildInteractiveQuery)(
+        formData,
+      ).queries[0].extras,
+    ).not.toHaveProperty('time_grain_sqla');
+  },
+);
 
 test('leaves saved SQL dataset lookup unchanged on dashboards', () => {
   const savedFormData = {
@@ -1280,4 +1296,148 @@ test('passes the form data of the last request to ChartContainer next to the cur
   expect(capturedChartContainerProps.formData).toEqual(
     expect.objectContaining({ groupby: ['region'] }),
   );
+});
+
+test('dashboard chart download: getPayload reflects ownState changed after the chart loaded', async () => {
+  const payload = { result_format: 'json', result_type: 'full' };
+  const buildPayload = jest
+    .spyOn(exploreUtils, 'buildChartDataExportPayload')
+    .mockResolvedValue(
+      payload as unknown as Awaited<
+        ReturnType<typeof exploreUtils.buildChartDataExportPayload>
+      >,
+    );
+  const run = jest.fn();
+  const disposables: common.Disposable[] = [
+    commands.registerCommand(
+      { id: 'ext.gs', title: 'Export to Google Sheets' },
+      run,
+    ),
+    menus.registerMenuItem(
+      { view: 'dashboard.chart.download', command: 'ext.gs' },
+      'dashboard.chart.download',
+      'primary',
+    ),
+  ];
+  try {
+    const store = createStore(
+      {
+        ...defaultState,
+        dashboardInfo: {
+          ...defaultState.dashboardInfo,
+          superset_can_download: true,
+        },
+        dataMask: { [queryId]: { ownState: { currentPage: 1 } } },
+      },
+      reducerIndex,
+    );
+    const { getByRole, findByText } = render(<Chart {...props} />, {
+      store,
+      useRouter: true,
+    });
+    fireEvent.click(getByRole('button', { name: 'More Options' }));
+    fireEvent.mouseOver(getByRole('menuitem', { name: 'Download right' }));
+    const item = await findByText('Export to Google Sheets');
+    expect(buildPayload).not.toHaveBeenCalled();
+
+    act(() => {
+      store.dispatch(
+        updateDataMask(queryId, {
+          id: queryId,
+          ownState: { currentPage: 7 },
+        } as DataMask),
+      );
+    });
+    fireEvent.click(item);
+    expect(run).toHaveBeenCalledTimes(1);
+
+    const ctx = run.mock.calls[0][0] as {
+      getPayload: () => Promise<unknown>;
+    };
+    await expect(ctx.getPayload()).resolves.toBe(payload);
+    expect(buildPayload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        formData: expect.objectContaining({ dashboardId: 111 }),
+        ownState: expect.objectContaining({ currentPage: 7 }),
+        resultType: 'full',
+      }),
+    );
+  } finally {
+    disposables.forEach(d => d.dispose());
+    buildPayload.mockRestore();
+  }
+});
+
+test('dashboard chart download: getPayload merges converted chart state into ownState', async () => {
+  jest
+    .spyOn(chartStateConverter, 'hasChartStateConverter')
+    .mockReturnValue(true);
+  const convert = jest
+    .spyOn(chartStateConverter, 'convertChartStateToOwnState')
+    .mockReturnValue({ sort: [{ columnId: 'column1', order: 'asc' }] });
+  const buildPayload = jest
+    .spyOn(exploreUtils, 'buildChartDataExportPayload')
+    .mockResolvedValue(
+      {} as unknown as Awaited<
+        ReturnType<typeof exploreUtils.buildChartDataExportPayload>
+      >,
+    );
+  const run = jest.fn();
+  const disposables: common.Disposable[] = [
+    commands.registerCommand(
+      { id: 'ext.gs', title: 'Export to Google Sheets' },
+      run,
+    ),
+    menus.registerMenuItem(
+      { view: 'dashboard.chart.download', command: 'ext.gs' },
+      'dashboard.chart.download',
+      'primary',
+    ),
+  ];
+  try {
+    const { getByRole, findByText } = render(<Chart {...props} />, {
+      store: createStore(
+        {
+          ...defaultState,
+          dashboardInfo: {
+            ...defaultState.dashboardInfo,
+            superset_can_download: true,
+          },
+          dataMask: { [queryId]: { ownState: { currentPage: 2 } } },
+          dashboardState: {
+            ...defaultState.dashboardState,
+            chartStates: {
+              [queryId]: { state: { sortColumn: 'column1', sortOrder: 'asc' } },
+            },
+          },
+        },
+        reducerIndex,
+      ),
+      useRouter: true,
+    });
+    fireEvent.click(getByRole('button', { name: 'More Options' }));
+    fireEvent.mouseOver(getByRole('menuitem', { name: 'Download right' }));
+    fireEvent.click(await findByText('Export to Google Sheets'));
+
+    const ctx = run.mock.calls[0][0] as {
+      getPayload: () => Promise<unknown>;
+    };
+    await ctx.getPayload();
+    expect(convert).toHaveBeenCalledWith(
+      expect.anything(),
+      { sortColumn: 'column1', sortOrder: 'asc' },
+      { forExport: true },
+    );
+    expect(buildPayload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownState: {
+          currentPage: 2,
+          sort: [{ columnId: 'column1', order: 'asc' }],
+        },
+      }),
+    );
+  } finally {
+    disposables.forEach(d => d.dispose());
+    jest.restoreAllMocks();
+  }
 });
