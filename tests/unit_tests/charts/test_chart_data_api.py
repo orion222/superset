@@ -1046,8 +1046,13 @@ def test_send_chart_response_does_not_project_timing_for_csv(
         app.config["CHART_DATA_INCLUDE_TIMING"] = True
         with (
             app.test_request_context("/api/v1/chart/data"),
-            patch("superset.charts.data.api.security_manager") as security_manager,
-            patch("superset.charts.data.api.is_feature_enabled", return_value=False),
+            patch(
+                "superset.charts.data.run_query_context.security_manager"
+            ) as security_manager,
+            patch(
+                "superset.charts.data.run_query_context.is_feature_enabled",
+                return_value=False,
+            ),
         ):
             security_manager.can_access.return_value = True
             response = api._send_chart_response(result)
@@ -1103,8 +1108,13 @@ def test_send_chart_response_uses_chart_name_for_csv_filename() -> None:
 
     api = ChartDataRestApi()
     with (
-        patch("superset.charts.data.api.security_manager") as mock_security_manager,
-        patch("superset.charts.data.api.is_feature_enabled", return_value=False),
+        patch(
+            "superset.charts.data.run_query_context.security_manager"
+        ) as mock_security_manager,
+        patch(
+            "superset.charts.data.run_query_context.is_feature_enabled",
+            return_value=False,
+        ),
     ):
         mock_security_manager.can_access.return_value = True
         response = api._send_chart_response(
@@ -1128,8 +1138,13 @@ def test_send_chart_response_uses_chart_name_for_xlsx_filename() -> None:
 
     api = ChartDataRestApi()
     with (
-        patch("superset.charts.data.api.security_manager") as mock_security_manager,
-        patch("superset.charts.data.api.is_feature_enabled", return_value=False),
+        patch(
+            "superset.charts.data.run_query_context.security_manager"
+        ) as mock_security_manager,
+        patch(
+            "superset.charts.data.run_query_context.is_feature_enabled",
+            return_value=False,
+        ),
     ):
         mock_security_manager.can_access.return_value = True
         response = api._send_chart_response(
@@ -1156,8 +1171,13 @@ def test_send_chart_response_uses_chart_name_for_zip_filename() -> None:
 
     api = ChartDataRestApi()
     with (
-        patch("superset.charts.data.api.security_manager") as mock_security_manager,
-        patch("superset.charts.data.api.is_feature_enabled", return_value=False),
+        patch(
+            "superset.charts.data.run_query_context.security_manager"
+        ) as mock_security_manager,
+        patch(
+            "superset.charts.data.run_query_context.is_feature_enabled",
+            return_value=False,
+        ),
     ):
         mock_security_manager.can_access.return_value = True
         response = api._send_chart_response(
@@ -1185,8 +1205,13 @@ def test_send_chart_response_does_not_double_extension_for_csv_filename() -> Non
 
     api = ChartDataRestApi()
     with (
-        patch("superset.charts.data.api.security_manager") as mock_security_manager,
-        patch("superset.charts.data.api.is_feature_enabled", return_value=False),
+        patch(
+            "superset.charts.data.run_query_context.security_manager"
+        ) as mock_security_manager,
+        patch(
+            "superset.charts.data.run_query_context.is_feature_enabled",
+            return_value=False,
+        ),
     ):
         mock_security_manager.can_access.return_value = True
         response = api._send_chart_response(
@@ -1295,8 +1320,13 @@ def test_send_chart_response_uses_query_context_slice_name() -> None:
 
     api = ChartDataRestApi()
     with (
-        patch("superset.charts.data.api.security_manager") as mock_security_manager,
-        patch("superset.charts.data.api.is_feature_enabled", return_value=False),
+        patch(
+            "superset.charts.data.run_query_context.security_manager"
+        ) as mock_security_manager,
+        patch(
+            "superset.charts.data.run_query_context.is_feature_enabled",
+            return_value=False,
+        ),
     ):
         mock_security_manager.can_access.return_value = True
         response = api._send_chart_response(
@@ -1324,8 +1354,13 @@ def test_send_chart_response_uses_route_slice_when_context_has_none() -> None:
 
     api = ChartDataRestApi()
     with (
-        patch("superset.charts.data.api.security_manager") as mock_security_manager,
-        patch("superset.charts.data.api.is_feature_enabled", return_value=False),
+        patch(
+            "superset.charts.data.run_query_context.security_manager"
+        ) as mock_security_manager,
+        patch(
+            "superset.charts.data.run_query_context.is_feature_enabled",
+            return_value=False,
+        ),
     ):
         mock_security_manager.can_access.return_value = True
         response = api._send_chart_response(
@@ -1351,8 +1386,13 @@ def test_send_chart_response_prefers_route_slice_over_query_context() -> None:
 
     api = ChartDataRestApi()
     with (
-        patch("superset.charts.data.api.security_manager") as mock_security_manager,
-        patch("superset.charts.data.api.is_feature_enabled", return_value=False),
+        patch(
+            "superset.charts.data.run_query_context.security_manager"
+        ) as mock_security_manager,
+        patch(
+            "superset.charts.data.run_query_context.is_feature_enabled",
+            return_value=False,
+        ),
     ):
         mock_security_manager.can_access.return_value = True
         response = api._send_chart_response(
@@ -1385,8 +1425,13 @@ def test_streaming_csv_response_uses_chart_name(app: SupersetApp) -> None:
     api = ChartDataRestApi()
     with (
         app.test_request_context("/api/v1/chart/data"),
-        patch("superset.charts.data.api.security_manager") as mock_security_manager,
-        patch("superset.charts.data.api.is_feature_enabled", return_value=False),
+        patch(
+            "superset.charts.data.run_query_context.security_manager"
+        ) as mock_security_manager,
+        patch(
+            "superset.charts.data.run_query_context.is_feature_enabled",
+            return_value=False,
+        ),
         patch.object(ChartDataRestApi, "_should_use_streaming", return_value=True),
         patch("superset.charts.data.api.StreamingCSVExportCommand"),
     ):
@@ -1461,7 +1506,7 @@ def test_create_query_context_from_form_converts_value_error_to_400() -> None:
     api = ChartDataRestApi()
     message = "From date cannot be larger than to date"
     with patch(
-        "superset.charts.data.api.ChartDataQueryContextSchema.load",
+        "superset.charts.data.run_query_context.ChartDataQueryContextSchema.load",
         side_effect=ValueError(message),
     ):
         with pytest.raises(ValidationError) as excinfo:
@@ -1502,9 +1547,13 @@ def test_get_data_response_streams_large_csv_without_executing(
         app.test_request_context("/api/v1/chart/data"),
         patch.dict(app.config, {"CSV_STREAMING_ROW_THRESHOLD": 100000}),
         patch(
-            "superset.charts.data.api.security_manager", new_callable=MagicMock
+            "superset.charts.data.run_query_context.security_manager",
+            new_callable=MagicMock,
         ) as mock_security_manager,
-        patch("superset.charts.data.api.is_feature_enabled", return_value=False),
+        patch(
+            "superset.charts.data.run_query_context.is_feature_enabled",
+            return_value=False,
+        ),
         patch.object(
             api, "_create_streaming_csv_response", return_value=streamed
         ) as mock_stream,
@@ -1581,10 +1630,11 @@ def test_get_data_response_streaming_up_front_requires_export_permission(
         app.test_request_context("/api/v1/chart/data"),
         patch.dict(app.config, {"CSV_STREAMING_ROW_THRESHOLD": 100000}),
         patch(
-            "superset.charts.data.api.security_manager", new_callable=MagicMock
+            "superset.charts.data.run_query_context.security_manager",
+            new_callable=MagicMock,
         ) as mock_security_manager,
         patch(
-            "superset.charts.data.api.is_feature_enabled",
+            "superset.charts.data.run_query_context.is_feature_enabled",
             return_value=granular_export_controls,
         ),
         patch.object(api, "_create_streaming_csv_response") as mock_stream,
@@ -1647,9 +1697,13 @@ def test_get_data_response_streaming_up_front_maps_setup_errors(
         app.test_request_context("/api/v1/chart/data"),
         patch.dict(app.config, {"CSV_STREAMING_ROW_THRESHOLD": 100000}),
         patch(
-            "superset.charts.data.api.security_manager", new_callable=MagicMock
+            "superset.charts.data.run_query_context.security_manager",
+            new_callable=MagicMock,
         ) as mock_security_manager,
-        patch("superset.charts.data.api.is_feature_enabled", return_value=False),
+        patch(
+            "superset.charts.data.run_query_context.is_feature_enabled",
+            return_value=False,
+        ),
         patch.object(
             api, "_create_streaming_csv_response", side_effect=exc
         ) as mock_stream,
@@ -1665,3 +1719,64 @@ def test_get_data_response_streaming_up_front_maps_setup_errors(
     assert response.json["message"] == str(exc)
     mock_stream.assert_called_once()
     command.execute.assert_not_called()
+
+
+def test_stop_data_route_is_registered_with_an_existing_permission() -> None:
+    """``stop_data`` must map onto ``can_read on Chart``.
+
+    FAB falls back to ``can_stop_data_Chart`` for an unmapped custom method — a
+    permission no standard role carries, which would make the endpoint
+    unreachable for exactly the users who can run chart queries.
+    """
+    assert "stop_data" in ChartDataRestApi.include_route_methods
+    assert ChartDataRestApi.method_permission_name["stop_data"] == "read"
+    # The mapping must extend, not replace, the inherited one.
+    assert ChartDataRestApi.method_permission_name["get"] == "read"
+
+
+def _raw_stop_data():
+    """The endpoint body, with FAB's auth/metrics decorators unwrapped off."""
+    return inspect.unwrap(ChartDataRestApi.stop_data)
+
+
+def test_stop_data_returns_cancellation_outcome() -> None:
+    api = ChartDataRestApi()
+    api.response = lambda status, **kwargs: (status, kwargs)
+
+    app = Flask(__name__)
+    with app.test_request_context(json={"client_id": "abc123"}):
+        with patch(
+            "superset.charts.data.api.cancel_chart_query_for_user", return_value=True
+        ) as cancel:
+            assert _raw_stop_data()(api) == (200, {"result": {"stopped": True}})
+    cancel.assert_called_once_with("abc123")
+
+
+def test_stop_data_reports_nothing_stopped_without_raising() -> None:
+    # No in-flight query for this user, or an engine that cannot cancel: a
+    # successful response reporting stopped=False, not an error.
+    api = ChartDataRestApi()
+    api.response = lambda status, **kwargs: (status, kwargs)
+
+    app = Flask(__name__)
+    with app.test_request_context(json={"client_id": "abc123"}):
+        with patch(
+            "superset.charts.data.api.cancel_chart_query_for_user", return_value=False
+        ):
+            assert _raw_stop_data()(api) == (200, {"result": {"stopped": False}})
+
+
+@pytest.mark.parametrize(
+    "body",
+    [{}, {"client_id": ""}, {"client_id": "x" * 65}, {"client_id": 5}],
+)
+def test_stop_data_rejects_invalid_bodies(body: dict[str, Any]) -> None:
+    api = ChartDataRestApi()
+    api.response_400 = lambda message: (400, message)
+
+    app = Flask(__name__)
+    with app.test_request_context(json=body):
+        with patch("superset.charts.data.api.cancel_chart_query_for_user") as cancel:
+            status, _ = _raw_stop_data()(api)
+    assert status == 400
+    cancel.assert_not_called()
